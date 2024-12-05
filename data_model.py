@@ -1,5 +1,6 @@
 import os
 import torch
+import torchvision
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
@@ -68,9 +69,11 @@ class CelebADataset(Dataset):
 
 # Define a custom transform to handle both image and bbox
 class ToTensorWithBBox:
+    def __init__(self):
+        self.image_transform = transforms.ToTensor()
     def __call__(self, image, bbox):
         # Convert the image to a tensor
-        image = transforms.ToTensor()(image)
+        image = self.image_transform(image)
         # Bboxes should be converted to float
         bbox = torch.tensor(bbox, dtype=torch.float32)
         return image, bbox
@@ -78,15 +81,23 @@ class ToTensorWithBBox:
 class ResizeWithBBox:
     def __init__(self, size):
         self.size = size
+        self.image_transform = transforms.Resize(self.size)
     def __call__(self, image, bbox):
-        dimensions = image.size
-        x_strech = dimensions[0]/self.size[0]
-        y_strech = dimensions[1]/self.size[1]
+        x_strech = image.size[0]/self.size[0]
+        y_strech = image.size[1]/self.size[1]
 
-        image = transforms.Resize(self.size)(image)
+        image = self.image_transform(image)
         bbox[0] = bbox[0]/x_strech
         bbox[1] = bbox[1]/y_strech
         bbox[2] = bbox[2]/x_strech
         bbox[3] = bbox[3]/y_strech
 
+        return image, bbox
+
+class NormaliseWithBBox:
+    def __init__(self, mean, std):
+        self.image_transform = torchvision.transforms.Normalize(mean, std)
+    def __call__(self, image, bbox):
+        # Convert the image to a tensor
+        image = self.image_transform(image)
         return image, bbox
