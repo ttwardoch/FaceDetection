@@ -1,4 +1,5 @@
 import os
+import random
 import torch
 import torchvision
 from torchvision import transforms
@@ -54,7 +55,7 @@ class CelebADataset(Dataset):
         image = Image.open(image_path).convert("RGB")
 
         # Get bounding box
-        bbox = self.bboxes[idx]
+        bbox = self.bboxes[idx].copy()
 
         # Get size of image
         size = self.image_sizes[idx]
@@ -94,10 +95,41 @@ class ResizeWithBBox:
 
         return image, bbox
 
+
 class NormaliseWithBBox:
     def __init__(self, mean, std):
         self.image_transform = torchvision.transforms.Normalize(mean, std)
     def __call__(self, image, bbox):
-        # Convert the image to a tensor
         image = self.image_transform(image)
+        return image, bbox
+
+
+class RandomHorizontalFlipWithBBox:
+    def __init__(self, prob):
+        self.image_transform = torchvision.transforms.RandomHorizontalFlip(p=1)
+        self.prob = prob
+    def __call__(self, image, bbox):
+        if random.random() < self.prob:
+            image = torchvision.transforms.v2.functional.horizontal_flip(image)
+            bbox[0] = image.size[0] - bbox[0] - bbox[2]
+        return image, bbox
+
+
+class RandomPadWithBBox:
+    def __init__(self, padding_range):
+        # padding_range is a tuple (min_padding, max_padding)
+        self.padding_range = padding_range
+
+    def __call__(self, image, bbox):
+        # Randomly select a padding size
+        padding = random.randint(self.padding_range[0], self.padding_range[1]) * min(image.size) // 100
+
+        # Apply padding to the image
+        image = torchvision.transforms.functional.pad(image, padding, fill=0, padding_mode='edge')
+
+        # Adjust the bounding box
+        # bbox is in format [x_min, y_min, width, height]
+        bbox[0] += padding  # Shift x_min by padding amount
+        bbox[1] += padding  # Shift y_min by padding amount
+
         return image, bbox
