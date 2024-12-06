@@ -23,7 +23,6 @@ class CelebADataset(Dataset):
         self.sizes_file = sizes_file
         self.transform = transform
 
-        # Load bounding boxes (assuming the bbox file is in the format of: image_id xmin ymin xmax ymax)
         self.bboxes = []
         self.image_names = []
         self.image_sizes = []
@@ -54,35 +53,32 @@ class CelebADataset(Dataset):
         image_path = os.path.join(self.image_dir, image_name)
         image = Image.open(image_path).convert("RGB")
 
-        # Get bounding box
         bbox = self.bboxes[idx].copy()
-
-        # Get size of image
-        size = self.image_sizes[idx]
+        
+        #size = self.image_sizes[idx]
 
         # Apply transformations if any
         if self.transform:
-            # To apply the same transformation to both image and bbox, we pass them together as a dictionary
             image, bbox = self.transform(image, bbox)
 
         return image, bbox
 
 
-# Define a custom transform to handle both image and bbox
 class ToTensorWithBBox:
     def __init__(self):
         self.image_transform = transforms.ToTensor()
+
     def __call__(self, image, bbox):
-        # Convert the image to a tensor
         image = self.image_transform(image)
-        # Bboxes should be converted to float
         bbox = torch.tensor(bbox, dtype=torch.float32)
         return image, bbox
+
 
 class ResizeWithBBox:
     def __init__(self, size):
         self.size = size
         self.image_transform = transforms.Resize(self.size)
+
     def __call__(self, image, bbox):
         x_strech = image.size[0]/self.size[0]
         y_strech = image.size[1]/self.size[1]
@@ -99,6 +95,7 @@ class ResizeWithBBox:
 class NormaliseWithBBox:
     def __init__(self, mean, std):
         self.image_transform = torchvision.transforms.Normalize(mean, std)
+
     def __call__(self, image, bbox):
         image = self.image_transform(image)
         return image, bbox
@@ -108,6 +105,7 @@ class RandomHorizontalFlipWithBBox:
     def __init__(self, prob):
         self.image_transform = torchvision.transforms.RandomHorizontalFlip(p=1)
         self.prob = prob
+        
     def __call__(self, image, bbox):
         if random.random() < self.prob:
             image = torchvision.transforms.v2.functional.horizontal_flip(image)
@@ -117,18 +115,13 @@ class RandomHorizontalFlipWithBBox:
 
 class RandomPadWithBBox:
     def __init__(self, padding_range):
-        # padding_range is a tuple (min_padding, max_padding)
         self.padding_range = padding_range
 
     def __call__(self, image, bbox):
-        # Randomly select a padding size
         padding = random.randint(self.padding_range[0], self.padding_range[1]) * min(image.size) // 100
 
-        # Apply padding to the image
         image = torchvision.transforms.functional.pad(image, padding, fill=0, padding_mode='edge')
 
-        # Adjust the bounding box
-        # bbox is in format [x_min, y_min, width, height]
         bbox[0] += padding  # Shift x_min by padding amount
         bbox[1] += padding  # Shift y_min by padding amount
 
